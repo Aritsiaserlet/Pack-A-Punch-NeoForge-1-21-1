@@ -1,0 +1,16 @@
+{
+  "itemGroup.packapunch.main": "Pack a Punch",
+
+  "block.packapunch.pack_a_punch_machine": "Pack-a-Punch Machine",
+
+  "container.packapunch.pack_a_punch_machine": "Pack-a-Punch Machine",
+
+  "tooltip.packapunch.pack_a_punch_machine": "Upgrade your weapons to lethal levels!",
+
+  "packapunch.upgrade.level": "Upgrade Level: %s",
+  "packapunch.upgrade.max": "MAX LEVEL",
+  "packapunch.upgrade.success": "Weapon upgraded successfully!",
+  "packapunch.upgrade.failed.no_materials": "Not enough materials!",
+  "packapunch.upgrade.failed.max_level": "This weapon is already at maximum level!",
+  "packapunch.upgrade.failed.invalid_gun": "This weapon cannot be upgraded!"
+}

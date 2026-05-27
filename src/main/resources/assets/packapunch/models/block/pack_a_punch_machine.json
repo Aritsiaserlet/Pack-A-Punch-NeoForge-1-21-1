@@ -1,0 +1,9 @@
+{
+  "parent": "minecraft:block/orientable",
+  "textures": {
+    "front": "packapunch:block/pack_a_punch_machine_front",
+    "side": "packapunch:block/pack_a_punch_machine_side",
+    "top": "packapunch:block/pack_a_punch_machine_top",
+    "bottom": "packapunch:block/pack_a_punch_machine_side"
+  }
+}
