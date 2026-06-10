@@ -68,9 +68,6 @@ public record UpgradeLevelComponent(int level) {
     //  CONSTANTS
     // ─────────────────────────────────────────────────────────
 
-    /** Maximum upgrade level. References centralized config. */
-    public static final int MAX_LEVEL = com.myname.packapunch.UpgradeConfig.MAX_LEVEL;
-
     // ─────────────────────────────────────────────────────────
     //  CODECS — how this component is read/written
     // ─────────────────────────────────────────────────────────
@@ -89,8 +86,7 @@ public record UpgradeLevelComponent(int level) {
      * For a single-field record, Codec.INT + xmap is idiomatic.
      */
     public static final Codec<UpgradeLevelComponent> CODEC =
-            Codec.intRange(0, MAX_LEVEL)
-                 .xmap(UpgradeLevelComponent::new, UpgradeLevelComponent::level);
+            Codec.INT.xmap(UpgradeLevelComponent::new, UpgradeLevelComponent::level);
 
     /**
      * STREAM_CODEC — Used for NETWORK SYNCHRONIZATION (server ↔ client).
@@ -124,6 +120,6 @@ public record UpgradeLevelComponent(int level) {
      *     so this is a belt-and-suspenders check)
      */
     public UpgradeLevelComponent(int level) {
-        this.level = Math.clamp(level, 0, MAX_LEVEL);
+        this.level = Math.clamp(level, 0, com.myname.packapunch.UpgradeConfig.getMaxLevel());
     }
 }

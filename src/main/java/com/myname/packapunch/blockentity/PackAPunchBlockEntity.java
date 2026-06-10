@@ -73,17 +73,13 @@ public class PackAPunchBlockEntity extends BlockEntity implements MenuProvider {
     //  CONSTANTS
     // ─────────────────────────────────────────────────────────
 
-    /** Number of inventory slots: 0=gun, 1=payment material */
-    public static final int SLOT_COUNT    = 2;
+    /** Number of inventory slots: 0=gun */
+    public static final int SLOT_COUNT    = 1;
     public static final int SLOT_GUN      = 0;
-    public static final int SLOT_PAYMENT  = 1;
 
     /** Number of integers tracked by ContainerData */
     public static final int DATA_COUNT         = 1;
     public static final int DATA_UPGRADE_LEVEL = 0;
-
-    /** Maximum upgrade level — will be moved to config later */
-    public static final int MAX_UPGRADE_LEVEL = com.myname.packapunch.UpgradeConfig.MAX_LEVEL;
 
     // ─────────────────────────────────────────────────────────
     //  FIELDS
@@ -340,7 +336,6 @@ public class PackAPunchBlockEntity extends BlockEntity implements MenuProvider {
         // getStackInSlot() returns the LIVE reference to the ItemStack in memory.
         // Modifying it in-place is safe here because we call setChanged() after.
         ItemStack gunStack     = itemHandler.getStackInSlot(SLOT_GUN);
-        ItemStack paymentStack = itemHandler.getStackInSlot(SLOT_PAYMENT);
 
         // ── VALIDATION 1: Gun slot must have an item ────────────────────
         if (gunStack.isEmpty()) {
@@ -355,7 +350,7 @@ public class PackAPunchBlockEntity extends BlockEntity implements MenuProvider {
         int currentLevel = (currentComp != null) ? currentComp.level() : 0;
 
         // ── VALIDATION 3: Level cap check ─────────────────────────────
-        if (currentLevel >= MAX_UPGRADE_LEVEL) {
+        if (currentLevel >= com.myname.packapunch.UpgradeConfig.getMaxLevel()) {
             sendHint(player, "❖ Already at maximum level!", ChatFormatting.GOLD);
             return;
         }
@@ -365,12 +360,13 @@ public class PackAPunchBlockEntity extends BlockEntity implements MenuProvider {
         net.minecraft.world.item.Item requiredItem = com.myname.packapunch.UpgradeConfig.getItemForLevel(nextLevel);
         int cost = com.myname.packapunch.UpgradeConfig.getCostForLevel(nextLevel);
 
-        if (!paymentStack.is(requiredItem)) {
-            String itemName = requiredItem.getDescription().getString();
-            sendHint(player, "× Place " + itemName + " in the payment slot!", ChatFormatting.RED);
-            return;
+        int count = 0;
+        for (int i = 0; i < player.getInventory().getContainerSize(); i++) {
+            ItemStack invStack = player.getInventory().getItem(i);
+            if (invStack.is(requiredItem)) count += invStack.getCount();
         }
-        if (paymentStack.getCount() < cost) {
+
+        if (count < cost) {
             String itemName = requiredItem.getDescription().getString();
             sendHint(player,
                     "× Need " + cost + " " + itemName + " for Level " + nextLevel + "!",
@@ -382,10 +378,17 @@ public class PackAPunchBlockEntity extends BlockEntity implements MenuProvider {
         // ALL VALIDATIONS PASSED — perform the upgrade atomically
         // ────────────────────────────────────────────────────────
 
-        // STEP 1: Consume diamonds via extractItem (goes through change notification)
-        // extractItem(slot, count, simulate=false) removes items for real.
-        // This triggers onContentsChanged() → setChanged() + sendBlockUpdated().
-        itemHandler.extractItem(SLOT_PAYMENT, cost, false);
+        // STEP 1: Consume items from player inventory
+        int remainingCost = cost;
+        for (int i = 0; i < player.getInventory().getContainerSize(); i++) {
+            ItemStack invStack = player.getInventory().getItem(i);
+            if (invStack.is(requiredItem)) {
+                int shrinkBy = Math.min(remainingCost, invStack.getCount());
+                invStack.shrink(shrinkBy);
+                remainingCost -= shrinkBy;
+                if (remainingCost <= 0) break;
+            }
+        }
 
         // STEP 2: Write new upgrade level onto the gun's Data Component.
         // stack.set() mutates the ItemStack in-place. Since we hold a live

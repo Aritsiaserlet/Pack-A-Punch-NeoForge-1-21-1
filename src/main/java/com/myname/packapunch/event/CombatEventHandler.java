@@ -72,7 +72,7 @@ public class CombatEventHandler {
      * Level 3 = x2.00
      */
     public static float getDamageMultiplier(int level) {
-        int clampedLevel = Math.clamp(level, 0, com.myname.packapunch.UpgradeConfig.MAX_LEVEL);
+        int clampedLevel = Math.clamp(level, 0, com.myname.packapunch.UpgradeConfig.getMaxLevel());
         return com.myname.packapunch.UpgradeConfig.getMultiplierForLevel(clampedLevel);
     }
 }

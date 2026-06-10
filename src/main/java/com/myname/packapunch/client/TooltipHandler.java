@@ -83,7 +83,7 @@ public class TooltipHandler {
         }
 
         int level = comp.level();
-        int maxLevel = UpgradeLevelComponent.MAX_LEVEL;
+        int maxLevel = com.myname.packapunch.UpgradeConfig.getMaxLevel();
 
         // ── Build star string ─────────────────────────────────────────────
         // "★".repeat(n) produces n filled stars

@@ -237,7 +237,6 @@ public class PackAPunchScreen extends AbstractContainerScreen<PackAPunchMenu> {
      */
     private void updateButtonState() {
         ItemStack gunStack = this.menu.getSlot(0).getItem();
-        ItemStack paymentStack = this.menu.getSlot(1).getItem();
 
         // 1. Missing Weapon
         if (gunStack.isEmpty()) {
@@ -259,15 +258,16 @@ public class PackAPunchScreen extends AbstractContainerScreen<PackAPunchMenu> {
         net.minecraft.world.item.Item requiredItem = com.myname.packapunch.UpgradeConfig.getItemForLevel(nextLevel);
         int nextCost = com.myname.packapunch.UpgradeConfig.getCostForLevel(nextLevel);
 
-        if (!paymentStack.is(requiredItem)) {
-            // Show exactly what item is required — driven entirely by UpgradeConfig
-            String itemName = requiredItem.getDescription().getString();
-            upgradeButton.setMessage(Component.literal("NEED: " + itemName));
-            upgradeButton.active = false;
-            return;
+        int count = 0;
+        net.minecraft.world.entity.player.Inventory playerInv = net.minecraft.client.Minecraft.getInstance().player.getInventory();
+        for (int i = 0; i < playerInv.getContainerSize(); i++) {
+            ItemStack invStack = playerInv.getItem(i);
+            if (invStack.is(requiredItem)) {
+                count += invStack.getCount();
+            }
         }
 
-        if (paymentStack.getCount() < nextCost) {
+        if (count < nextCost) {
             String itemName = requiredItem.getDescription().getString();
             upgradeButton.setMessage(Component.literal("NEED " + nextCost + " " + itemName));
             upgradeButton.active = false;
@@ -373,7 +373,7 @@ public class PackAPunchScreen extends AbstractContainerScreen<PackAPunchMenu> {
         // All values are read from UpgradeConfig — never hardcoded here.
         int level = this.menu.getUpgradeLevel();
 
-        String levelText = "Level " + level + " / " + com.myname.packapunch.UpgradeConfig.MAX_LEVEL;
+        String levelText = "Level " + level + " / " + com.myname.packapunch.UpgradeConfig.getMaxLevel();
         String multiplierText = "Multiplier x" + com.myname.packapunch.UpgradeConfig.getMultiplierForLevel(level);
 
         int textX = (this.imageWidth / 2) - (this.font.width(levelText) / 2);
@@ -403,14 +403,6 @@ public class PackAPunchScreen extends AbstractContainerScreen<PackAPunchMenu> {
             graphics.drawString(this.font, maxText, maxX, 70, 0xFF55FF, true);
         }
 
-        // ── Slot Labels ────────────────────────────────────────────────────
-        // Small labels above each slot to explain their purpose.
-        // "GUN" label above the gun slot (x=44, y=35 → label at y=25)
-        graphics.drawString(this.font, "GUN",
-                42, 25, COLOR_LIGHT_GRAY, false);
 
-        // "COST" label above the payment slot (x=116, y=35 → label at y=25)
-        graphics.drawString(this.font, "COST",
-                111, 25, COLOR_LIGHT_GRAY, false);
     }
 }

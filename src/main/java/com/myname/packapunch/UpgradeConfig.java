@@ -1,86 +1,58 @@
 package com.myname.packapunch;
 
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.Items;
+import net.minecraft.core.registries.BuiltInRegistries;
+import java.util.List;
+import com.myname.packapunch.config.MyModConfig;
 
-/**
- * ╔══════════════════════════════════════════════════════════╗
- * ║        UPGRADECONFIG — SINGLE SOURCE OF TRUTH           ║
- * ╚══════════════════════════════════════════════════════════╝
- *
- * This class acts as the centralized configuration for all upgrade
- * progression logic, costs, and multipliers.
- *
- * It guarantees that GUI text, server validation, and tooltip rendering
- * always use the same values without duplicating magic numbers across
- * the codebase.
- */
 public class UpgradeConfig {
-    
-    // ─────────────────────────────────────────────────────────
-    //  CENTRALIZED CONSTANTS
-    // ─────────────────────────────────────────────────────────
 
-    public static final int MAX_LEVEL = 5;
-
-    // The index corresponds to (nextLevel - 1).
-    // Level 1: index 0. Level 5: index 4.
-    private static final Item[] UPGRADE_ITEMS = {
-        Items.DIAMOND_BLOCK,    // Level 1
-        Items.DIAMOND_BLOCK,    // Level 2
-        Items.DIAMOND_BLOCK,    // Level 3
-        Items.NETHERITE_BLOCK,  // Level 4
-        Items.NETHERITE_BLOCK   // Level 5
-    };
-
-    private static final int[] UPGRADE_COSTS = {
-        16, // Level 1
-        32, // Level 2
-        64, // Level 3
-        4,  // Level 4
-        8   // Level 5
-    };
-
-    // The index corresponds directly to the current level.
-    // Level 0: index 0. Level 5: index 5.
-    private static final float[] DAMAGE_MULTIPLIERS = {
-        1.0f, // Level 0 (Base)
-        1.2f, // Level 1
-        1.5f, // Level 2
-        2.0f, // Level 3
-        2.5f, // Level 4
-        3.0f  // Level 5
-    };
-
-    // ─────────────────────────────────────────────────────────
-    //  HELPER METHODS (With Safe Fallbacks)
-    // ─────────────────────────────────────────────────────────
+    public static int getMaxLevel() {
+        return MyModConfig.UPGRADES.get().size();
+    }
 
     public static boolean isMaxLevel(int level) {
-        return level >= MAX_LEVEL;
+        return level >= getMaxLevel();
+    }
+
+    private static String[] getParsedLevel(int level) {
+        List<? extends String> upgrades = MyModConfig.UPGRADES.get();
+        if (level > 0 && level <= upgrades.size()) {
+            return upgrades.get(level - 1).split(";");
+        }
+        return new String[0];
     }
 
     public static Item getItemForLevel(int nextLevel) {
-        if (nextLevel < 1 || nextLevel > MAX_LEVEL) {
-            PackAPunchMod.LOGGER.error("[UpgradeConfig] Invalid nextLevel {} for getItemForLevel. Falling back to default.", nextLevel);
-            return Items.DIAMOND_BLOCK; // Safe fallback
+        String[] parts = getParsedLevel(nextLevel);
+        if (parts.length >= 2) {
+            String itemId = parts[1].trim();
+            Item item = BuiltInRegistries.ITEM.get(ResourceLocation.parse(itemId));
+            return item != null ? item : Items.AIR;
         }
-        return UPGRADE_ITEMS[nextLevel - 1];
+        return Items.AIR;
     }
 
     public static int getCostForLevel(int nextLevel) {
-        if (nextLevel < 1 || nextLevel > MAX_LEVEL) {
-            PackAPunchMod.LOGGER.error("[UpgradeConfig] Invalid nextLevel {} for getCostForLevel. Falling back to default.", nextLevel);
-            return 999; // Safe fallback (unaffordable to prevent exploits)
+        String[] parts = getParsedLevel(nextLevel);
+        if (parts.length >= 3) {
+            try {
+                return Integer.parseInt(parts[2].trim());
+            } catch (NumberFormatException e) { return 1; }
         }
-        return UPGRADE_COSTS[nextLevel - 1];
+        return 1;
     }
 
     public static float getMultiplierForLevel(int level) {
-        if (level < 0 || level > MAX_LEVEL) {
-            PackAPunchMod.LOGGER.error("[UpgradeConfig] Invalid level {} for getMultiplierForLevel. Falling back to 1.0f.", level);
-            return 1.0f; // Safe fallback (no bonus multiplier)
+        if (level <= 0) return 1.0f;
+        String[] parts = getParsedLevel(level);
+        if (parts.length >= 1) {
+            try {
+                return Float.parseFloat(parts[0].trim());
+            } catch (NumberFormatException e) { return 1.0f; }
         }
-        return DAMAGE_MULTIPLIERS[level];
+        return 1.0f;
     }
 }
