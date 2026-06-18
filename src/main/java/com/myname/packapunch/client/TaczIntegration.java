@@ -39,17 +39,76 @@ public class TaczIntegration {
             java.lang.reflect.Method getGunData = gunIndex.getClass().getMethod("getGunData");
             Object gunData = getGunData.invoke(gunIndex);
 
-            // 5. Search for damage deeply inside GunData and its sub-objects (e.g., BulletData)
-            float baseDamage = findDamageDeep(gunData, 0);
+            // 5. Search for Base Damage and Explosion Damage
+            float baseDamage = -1;
+            float explosionDamage = -1;
 
-            // 6. If we successfully found the base damage, append our custom line
-            if (baseDamage > 0) {
-                float packDamage = baseDamage * multiplier;
-                String formattedDamage = String.format(java.util.Locale.US, packDamage % 1.0 == 0 ? "%.0f" : "%.1f", packDamage);
-                Component newComp = Component.literal("Damage: " + formattedDamage)
-                    .withStyle(ChatFormatting.GREEN);
+            // วิธีที่ 1: ลองหา Method ที่รับ ItemStack และคืนค่า Damage ใน IGun
+            for (java.lang.reflect.Method m : iGunClass.getMethods()) {
+                if (m.getParameterCount() == 1 && m.getParameterTypes()[0] == ItemStack.class) {
+                    String name = m.getName().toLowerCase(java.util.Locale.US);
+                    if (name.contains("damage")) {
+                        try {
+                            Object result = m.invoke(iGunObj, stack);
+                            if (result instanceof Number) {
+                                float val = ((Number)result).floatValue();
+                                if (name.contains("explosion")) {
+                                    if (val > explosionDamage) explosionDamage = val;
+                                } else if (!name.contains("armor") && !name.contains("headshot")) {
+                                    if (val > baseDamage) baseDamage = val;
+                                }
+                            }
+                        } catch (Exception e) {}
+                    }
+                }
+            }
+
+            // วิธีที่ 2: ลองหาใน TimelessAPI แบบ Static
+            if (baseDamage <= 0 || explosionDamage <= 0) {
+                for (java.lang.reflect.Method m : timelessApiClass.getMethods()) {
+                    if (java.lang.reflect.Modifier.isStatic(m.getModifiers()) && m.getParameterCount() == 1 && m.getParameterTypes()[0] == ItemStack.class) {
+                        String name = m.getName().toLowerCase(java.util.Locale.US);
+                        if (name.contains("damage")) {
+                            try {
+                                Object result = m.invoke(null, stack);
+                                if (result instanceof Number) {
+                                    float val = ((Number)result).floatValue();
+                                    if (name.contains("explosion") && val > explosionDamage) {
+                                        explosionDamage = val;
+                                    } else if (!name.contains("armor") && !name.contains("headshot") && val > baseDamage) {
+                                        baseDamage = val;
+                                    }
+                                }
+                            } catch (Exception e) {}
+                        }
+                    }
+                }
+            }
+
+            // วิธีที่ 3: ดึงข้อมูลจาก GunData ตรงๆ
+            if (gunData != null) {
+                if (baseDamage <= 0) baseDamage = findSpecificDamageDeep(gunData, 0, false);
+                if (explosionDamage <= 0) explosionDamage = findSpecificDamageDeep(gunData, 0, true);
+            }
+
+            // 6. แทรกข้อความ Pack-A-Punch
+            if (baseDamage > 0 || explosionDamage > 0) {
+                String text = "Damage: ";
+                if (baseDamage > 0) {
+                    float packDamage = baseDamage * multiplier;
+                    text += String.format(java.util.Locale.US, packDamage % 1.0 == 0 ? "%.0f" : "%.1f", packDamage);
+                } else {
+                    text += "0";
+                }
                 
-                // Find the Damage Bonus line and insert right below it
+                if (explosionDamage > 0) {
+                    float packExp = explosionDamage * multiplier;
+                    text += " + " + String.format(java.util.Locale.US, packExp % 1.0 == 0 ? "%.0f" : "%.1f", packExp) + " (Explosion)";
+                }
+
+                Component newComp = Component.literal(text).withStyle(ChatFormatting.GREEN);
+                
+                // หาบรรทัด Damage Bonus เพื่อแทรกต่อท้าย
                 int insertIndex = elements.size();
                 for (int i = 0; i < elements.size(); i++) {
                     var element = elements.get(i);
@@ -64,63 +123,71 @@ public class TaczIntegration {
                 }
                 elements.add(insertIndex, com.mojang.datafixers.util.Either.left(newComp));
             } else {
-                Component debugComp = Component.literal("Pack-A-Punch TaCZ Error: Damage field not found! Methods:")
-                    .withStyle(ChatFormatting.RED);
+                Component debugComp = Component.literal("Pack-A-Punch TaCZ Error: Damage field not found!").withStyle(ChatFormatting.RED);
                 elements.add(com.mojang.datafixers.util.Either.left(debugComp));
-                
-                // Dump all method names to tooltip so we can see what's available
-                StringBuilder msgs = new StringBuilder();
-                for (java.lang.reflect.Method m : gunData.getClass().getMethods()) {
-                    if (m.getParameterCount() == 0 && m.getDeclaringClass() != Object.class) {
-                        msgs.append(m.getName()).append(", ");
-                    }
-                }
-                elements.add(com.mojang.datafixers.util.Either.left(
-                    Component.literal(msgs.toString()).withStyle(ChatFormatting.GRAY)
-                ));
             }
         } catch (Throwable t) {
-            // Soft dependency: if TaCZ API changes or classes are missing, show on tooltip for debugging.
-            Component errorComp = Component.literal("Pack-A-Punch TaCZ Error: " + t.toString())
-                .withStyle(ChatFormatting.RED);
-            elements.add(com.mojang.datafixers.util.Either.left(errorComp));
+            // ปล่อยผ่านเงียบๆ
         }
     }
 
-    private static float findDamageDeep(Object obj, int depth) {
-        if (depth > 2 || obj == null) return -1;
+    private static float findSpecificDamageDeep(Object obj, int depth, boolean lookForExplosion) {
+        if (depth > 5 || obj == null) return -1;
+        if (obj instanceof java.util.Optional) {
+            java.util.Optional<?> opt = (java.util.Optional<?>) obj;
+            if (!opt.isPresent()) return -1;
+            obj = opt.get();
+        }
         
-        // Priority 1: Exact matches for common base damage getters
-        for (java.lang.reflect.Method m : obj.getClass().getMethods()) {
+        float maxVal = -1;
+        Class<?> clazz = obj.getClass();
+        
+        for (java.lang.reflect.Method m : clazz.getMethods()) {
             if (m.getParameterCount() == 0 && m.getDeclaringClass() != Object.class) {
                 String name = m.getName().toLowerCase(java.util.Locale.US);
-                if (name.equals("getdamage") || name.equals("damage") || 
-                    name.equals("getbasedamage") || name.equals("basedamage") ||
-                    name.equals("getbulletdamage") || name.equals("getgunbasedamage") ||
-                    name.equals("getdamageamount") || name.equals("damageamount")) {
+                boolean match = false;
+                
+                if (lookForExplosion) {
+                    if (name.contains("explosion") && name.contains("damage")) match = true;
+                    else if (clazz.getName().toLowerCase(java.util.Locale.US).contains("explosion") && name.contains("damage") && !name.contains("armor")) match = true;
+                } else {
+                    if (name.contains("damage") && !name.contains("armor") && !name.contains("headshot") 
+                        && !name.contains("multiplier") && !name.contains("reduction") 
+                        && !name.contains("explosion") && !name.contains("knockback")
+                        && !name.contains("fire") && !name.contains("ignite") && !name.contains("distance")
+                        && !name.contains("rate") && !name.contains("speed")) {
+                        match = true;
+                    }
+                }
+
+                if (match) {
                     try {
                         Object result = m.invoke(obj);
                         if (result instanceof Number) {
-                            return ((Number)result).floatValue();
+                            float val = ((Number)result).floatValue();
+                            if (val > maxVal) maxVal = val;
                         }
                     } catch (Exception e) {}
                 }
             }
         }
         
-        // Priority 2: Check sub-objects (like BulletData) for exact matches
-        for (java.lang.reflect.Method m : obj.getClass().getMethods()) {
+        if (maxVal > 0) return maxVal;
+        
+        for (java.lang.reflect.Method m : clazz.getMethods()) {
             if (m.getParameterCount() == 0 && m.getDeclaringClass() != Object.class) {
-                if (m.getReturnType().getName().contains("tacz")) {
+                String rType = m.getReturnType().getName().toLowerCase(java.util.Locale.US);
+                
+                // Recurse into any TaCZ class, or Optional
+                if ((rType.contains("tacz") || rType.contains("optional")) && !m.getReturnType().isEnum()) {
                     try {
                         Object result = m.invoke(obj);
-                        float dmg = findDamageDeep(result, depth + 1);
-                        if (dmg > 0) return dmg;
+                        float dmg = findSpecificDamageDeep(result, depth + 1, lookForExplosion);
+                        if (dmg > maxVal) maxVal = dmg;
                     } catch (Exception e) {}
                 }
             }
         }
-        
-        return -1;
+        return maxVal;
     }
 }
