@@ -1,40 +1,25 @@
-# Pack-a-Punch Machine
 
-Upgrade any weapon. Dominate late-game. Pack-a-Punch Machine brings the iconic upgrade system into Minecraft boosting damage output on any weapon or damage-dealing item, with full support for both Vanilla and TaCZ firearms. Built for Zombie Apocalypse, Hardcore Survival, and high-difficulty modpacks where enemies hit hard and late-game progression matters.
+Installation information
+=======
 
-## Main Features
-* **Works with any weapon that has base damage** - Vanilla or modded
-* **Compatible with TaCZ** Official 1.20.1 & TaCZ Unofficial 1.21.1
-* **Fully Customizable Config** - Add unlimited upgrade tiers! Define custom damage multipliers, required items, and costs via a simple config string (e.g., `1.2;minecraft:diamond_block;12`).
-* **One-Slot Smart UI** - Payment materials are drawn directly from the player's inventory, keeping the UI clean and saving you from manually splitting item stacks.
-* **Runtime damage scaling** - No permanent modification to weapon stats
-* **Multiplayer-safe** - No permanent stat modification, sync-friendly
-* **Modpack-friendly** and designed for future expansion
+This template repository can be directly cloned to get you started with a new
+mod. Simply create a new repository cloned from this one, by following the
+instructions provided by [GitHub](https://docs.github.com/en/repositories/creating-and-managing-repositories/creating-a-repository-from-a-template).
 
-## Default Upgrade Levels (Fully Configurable)
-Out of the box, the mod comes with 3 default tiers, but **you can add as many levels as you want (up to 100+)** in the `packapunch-common.toml` config file!
+Once you have your clone, simply open the repository in the IDE of your choice. The usual recommendation for an IDE is either IntelliJ IDEA or Eclipse.
 
-* **Level 1 - x1.2** 
-  Requires: 12 Diamond Blocks
-* **Level 2 - x1.5** 
-  Requires: 24 Diamond Blocks
-* **Level 3 - x2.0** 
-  Requires: 2 Netherite Blocks
+If at any point you are missing libraries in your IDE, or you've run into problems you can
+run `gradlew --refresh-dependencies` to refresh the local cache. `gradlew clean` to reset everything 
+{this does not affect your code} and then start the process again.
 
-## Developer Note
-This mod was inspired by older Pack-a-Punched mods and rebuilt specifically for NeoForge 1.21.1 to support newer TaCZ systems and improve late-game balance in survival-focused modpacks. A Forge 1.20.1 port is also available for players on older modpack setups.
+Mapping Names:
+============
+By default, the MDK is configured to use the official mapping names from Mojang for methods and fields 
+in the Minecraft codebase. These names are covered by a specific license. All modders should be aware of this
+license. For the latest license text, refer to the mapping file itself, or the reference copy here:
+https://github.com/NeoForged/NeoForm/blob/main/Mojang.md
 
-Huge respect and credits to the original creator(s) of the earlier Pack-a-Punched mods for the original idea and inspiration that helped shape this project.
-
-This is not intended to replace or disrespect the original mod in any way - it is a modern reimagining focused on compatibility, stability, and support for newer gameplay systems.
-
-## Feedback & Balance
-This mod is still actively being balanced and improved. If you encounter any of the following, please report them:
-* Bugs or crashes
-* Compatibility issues
-* Damage calculation problems
-* Upgrade exploits
-* Multiplayer desyncs
-* Balance or progression issues
-
-Upgrade costs may still change in future updates based on player feedback, as late-game costs are still being tested for Hardcore and Zombie Apocalypse modpacks. All feedback is appreciated and helps make the mod better!
+Additional Resources: 
+==========
+Community Documentation: https://docs.neoforged.net/  
+NeoForged Discord: https://discord.neoforged.net/
