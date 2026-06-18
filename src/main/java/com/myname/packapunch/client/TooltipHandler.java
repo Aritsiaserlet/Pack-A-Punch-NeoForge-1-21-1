@@ -71,7 +71,7 @@ public class TooltipHandler {
      *
      * @param event The tooltip event containing item and mutable tooltip list.
      */
-    @SubscribeEvent
+    @SubscribeEvent(priority = net.neoforged.bus.api.EventPriority.LOWEST)
     public static void onItemTooltip(ItemTooltipEvent event) {
         ItemStack stack = event.getItemStack();
 
@@ -97,8 +97,6 @@ public class TooltipHandler {
 
         float multiplier = com.myname.packapunch.UpgradeConfig.getMultiplierForLevel(level);
         event.getToolTip().add(2, Component.literal("Damage Bonus: x" + multiplier).withStyle(ChatFormatting.YELLOW));
-
-        int insertIndex = 3;
 
         // ── Calculate dynamic final damage for Vanilla weapons ───────────
         double playerBaseDamage = 1.0; // Minecraft player's default unarmed damage
@@ -127,35 +125,88 @@ public class TooltipHandler {
             }
         }
 
+        double vanillaFinalDamage = 0;
         if (hasAttackDamageModifier) {
-            // Reconstruct the true displayed damage (what Vanilla tooltip calculates)
             double totalBaseDamage = (playerBaseDamage + addValue) * (1.0 + addMultipliedBase) * (1.0 + addMultipliedTotal);
-            
-            // Apply our runtime multiplier
-            double finalDamage = totalBaseDamage * multiplier;
-            
-            // Format to 1 decimal place
-            String formattedDamage = String.format("%.1f", finalDamage);
-            event.getToolTip().add(insertIndex++, Component.literal("Current Damage: " + formattedDamage).withStyle(ChatFormatting.GREEN));
+            vanillaFinalDamage = totalBaseDamage * multiplier;
         }
 
-        // Add blank line
-        event.getToolTip().add(insertIndex++, Component.empty());
-        event.getToolTip().add(insertIndex++, Component.literal("Next Upgrade:").withStyle(ChatFormatting.GRAY));
+        // ── Scan and modify existing tooltips for Base Damage ───────────
+        for (int i = 0; i < event.getToolTip().size(); i++) {
+            Component tooltipLine = event.getToolTip().get(i);
+            String rawText = tooltipLine.getString();
+            String strippedText = net.minecraft.ChatFormatting.stripFormatting(rawText);
+            if (strippedText == null) strippedText = rawText;
 
-        // ── Next upgrade cost hint ───────────────────────────────────────
-        if (com.myname.packapunch.UpgradeConfig.isMaxLevel(level)) {
-            event.getToolTip().add(insertIndex,
-                    Component.literal("MAX LEVEL")
-                            .withStyle(ChatFormatting.LIGHT_PURPLE, ChatFormatting.ITALIC));
-        } else {
-            int nextCost = com.myname.packapunch.UpgradeConfig.getCostForLevel(level + 1);
-            net.minecraft.world.item.Item reqItem = com.myname.packapunch.UpgradeConfig.getItemForLevel(level + 1);
-            String reqItemName = reqItem.getDescription().getString();
-            
-            event.getToolTip().add(insertIndex,
-                    Component.literal(nextCost + " " + reqItemName)
-                            .withStyle(ChatFormatting.AQUA));
+            // Vanilla Attack Damage
+            if (hasAttackDamageModifier && (strippedText.contains("Attack Damage") || strippedText.contains("ดาเมจโจมตี"))) {
+                String formattedDamage = String.format(java.util.Locale.US, vanillaFinalDamage % 1.0 == 0 ? "%.0f" : "%.1f", vanillaFinalDamage);
+
+                event.getToolTip().set(i, tooltipLine.copy().append(
+                        Component.literal(" (" + formattedDamage + ")").withStyle(ChatFormatting.GREEN)
+                ));
+                hasAttackDamageModifier = false; // Only append to the first matching line
+            }
+        }
+    }
+
+    @SubscribeEvent(priority = net.neoforged.bus.api.EventPriority.LOWEST)
+    public static void onGatherComponents(net.neoforged.neoforge.client.event.RenderTooltipEvent.GatherComponents event) {
+        ItemStack stack = event.getItemStack();
+        UpgradeLevelComponent comp = stack.get(ModDataComponents.UPGRADE_LEVEL.get());
+        if (comp == null || comp.level() <= 0) return;
+
+        int level = comp.level();
+        float multiplier = com.myname.packapunch.UpgradeConfig.getMultiplierForLevel(level);
+        // Relaxed regex: removed ^\s* so it catches "Damage" anywhere in the line
+        java.util.regex.Pattern damagePattern = java.util.regex.Pattern.compile("(?i)(?:Damage|ดาเมจ).*?(\\d+(?:\\.\\d+)?)");
+
+        var elements = event.getTooltipElements();
+        boolean foundTaczDamage = false;
+
+        // Pass 1: Standard FormattedText
+        for (int i = 0; i < elements.size(); i++) {
+            var element = elements.get(i);
+            if (element.left().isPresent()) {
+                net.minecraft.network.chat.FormattedText text = element.left().get();
+                String rawText = text.getString();
+                String strippedText = net.minecraft.ChatFormatting.stripFormatting(rawText);
+                if (strippedText == null) strippedText = rawText;
+
+                if (strippedText.contains("Damage Bonus") || strippedText.contains("โบนัสดาเมจ") ||
+                    strippedText.contains("Attack Damage") || strippedText.contains("ดาเมจโจมตี")) {
+                    continue;
+                }
+
+                java.util.regex.Matcher matcher = damagePattern.matcher(strippedText);
+                if (matcher.find()) {
+                    try {
+                        String numStr = matcher.group(1);
+                        double baseDam = Double.parseDouble(numStr);
+                        double packDamage = baseDam * multiplier;
+                        String formattedDamage = String.format(java.util.Locale.US, packDamage % 1.0 == 0 ? "%.0f" : "%.1f", packDamage);
+
+                        Component newComp;
+                        if (text instanceof Component compText) {
+                            newComp = compText.copy().append(
+                                    Component.literal(" (" + formattedDamage + ")").withStyle(ChatFormatting.GREEN)
+                            );
+                        } else {
+                            newComp = Component.literal(rawText + " (" + formattedDamage + ")").withStyle(ChatFormatting.DARK_GREEN);
+                        }
+                        
+                        elements.set(i, com.mojang.datafixers.util.Either.left(newComp));
+                        foundTaczDamage = true;
+                    } catch (Exception e) {
+                        // Ignore
+                    }
+                }
+            }
+        }
+
+        // Pass 2: TaCZ Soft Dependency Integration
+        if (!foundTaczDamage) {
+            TaczIntegration.tryAddTaczDamageTooltip(stack, multiplier, elements);
         }
     }
 }
