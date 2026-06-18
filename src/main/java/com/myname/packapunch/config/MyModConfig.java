@@ -3,6 +3,7 @@ package com.myname.packapunch.config;
 import net.neoforged.neoforge.common.ModConfigSpec;
 import java.util.List;
 
+@SuppressWarnings({"null", "deprecation"})
 public class MyModConfig {
     public static final ModConfigSpec.Builder BUILDER = new ModConfigSpec.Builder();
     public static final ModConfigSpec COMMON_SPEC;
@@ -19,7 +20,7 @@ public class MyModConfig {
                         "Format: <multiplier>;<item_id>;<cost_amount>",
                         "Example: 1.2;minecraft:diamond_block;12"
                 )
-                .defineListAllowEmpty("upgrades", List.of(
+                .defineList("upgrades", List.of(
                         "1.2;minecraft:diamond_block;12",
                         "1.5;minecraft:diamond_block;24",
                         "2.0;minecraft:netherite_block;2"

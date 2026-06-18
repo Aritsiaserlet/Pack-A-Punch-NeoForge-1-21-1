@@ -7,6 +7,7 @@ import net.minecraft.core.registries.BuiltInRegistries;
 import java.util.List;
 import com.myname.packapunch.config.MyModConfig;
 
+@SuppressWarnings("null")
 public class UpgradeConfig {
 
     public static int getMaxLevel() {
