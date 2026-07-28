@@ -65,43 +65,13 @@ import net.minecraft.network.codec.StreamCodec;
 public record UpgradeLevelComponent(int level) {
 
     // ─────────────────────────────────────────────────────────
-    //  CONSTANTS
-    // ─────────────────────────────────────────────────────────
-
-    // ─────────────────────────────────────────────────────────
     //  CODECS — how this component is read/written
     // ─────────────────────────────────────────────────────────
 
-    /**
-     * CODEC — Used for DISK PERSISTENCE (NBT / JSON in world save files).
-     *
-     * Codec.INT wraps a raw integer. We use xmap to convert:
-     *   int → UpgradeLevelComponent  (when reading from disk)
-     *   UpgradeLevelComponent → int  (when writing to disk)
-     *
-     * In the world save, this produces a tag like:
-     *   "packapunch:upgrade_level": 2
-     *
-     * Alternative: RecordCodecBuilder for multi-field records.
-     * For a single-field record, Codec.INT + xmap is idiomatic.
-     */
     public static final Codec<UpgradeLevelComponent> CODEC =
-            Codec.INT.xmap(UpgradeLevelComponent::new, UpgradeLevelComponent::level);
+            Codec.intRange(0, 100)
+                 .xmap(UpgradeLevelComponent::new, UpgradeLevelComponent::level);
 
-    /**
-     * STREAM_CODEC — Used for NETWORK SYNCHRONIZATION (server ↔ client).
-     *
-     * When the server sends an ItemStack to the client (e.g., slot sync),
-     * NeoForge serializes all attached components using their StreamCodecs.
-     * The client deserializes them using the same codec.
-     *
-     * ByteBuf is the raw network buffer — more compact than NBT.
-     * ByteBufCodecs.VAR_INT writes a variable-length integer (1–5 bytes),
-     * which is more efficient than a fixed 4-byte INT for small numbers.
-     *
-     * The client therefore always sees the authoritative server value —
-     * it NEVER needs to compute upgrade level locally.
-     */
     public static final StreamCodec<ByteBuf, UpgradeLevelComponent> STREAM_CODEC =
             ByteBufCodecs.VAR_INT.map(UpgradeLevelComponent::new, UpgradeLevelComponent::level);
 
@@ -109,17 +79,7 @@ public record UpgradeLevelComponent(int level) {
     //  COMPACT CONSTRUCTOR — validation
     // ─────────────────────────────────────────────────────────
 
-    /**
-     * Compact constructor (Java record feature) — runs before field assignment.
-     * We validate the level range here so it's impossible to create an
-     * UpgradeLevelComponent with an illegal value.
-     *
-     * This protects against:
-     *   - Bugs where tryUpgrade() miscalculates the new level
-     *   - Malicious data in save files (CODEC uses intRange(0, MAX_LEVEL)
-     *     so this is a belt-and-suspenders check)
-     */
     public UpgradeLevelComponent(int level) {
-        this.level = Math.clamp(level, 0, com.myname.packapunch.UpgradeConfig.getMaxLevel());
+        this.level = Math.clamp(level, 0, 100);
     }
 }

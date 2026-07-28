@@ -11,9 +11,8 @@ import com.myname.packapunch.registry.ModMenuTypes;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.ModContainer;
 import net.neoforged.fml.common.Mod;
-import net.neoforged.fml.config.ModConfig;
 import net.neoforged.fml.event.lifecycle.FMLCommonSetupEvent;
-import com.myname.packapunch.config.MyModConfig;
+import net.neoforged.fml.config.ModConfig;
 import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
 import org.slf4j.Logger;
 
@@ -80,7 +79,7 @@ public class PackAPunchMod {
     public PackAPunchMod(IEventBus modEventBus, ModContainer modContainer) {
         LOGGER.info("[PackAPunch] Mod is loading...");
 
-        modContainer.registerConfig(ModConfig.Type.COMMON, MyModConfig.COMMON_SPEC);
+        modContainer.registerConfig(net.neoforged.fml.config.ModConfig.Type.COMMON, com.myname.packapunch.config.ModConfig.SPEC, "packapunch-common.toml");
 
         // ── Register all our custom Blocks ──────────────────────
         ModBlocks.BLOCKS.register(modEventBus);

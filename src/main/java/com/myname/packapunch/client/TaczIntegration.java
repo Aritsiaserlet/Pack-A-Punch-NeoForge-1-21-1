@@ -8,95 +8,68 @@ import java.util.List;
 
 public class TaczIntegration {
     
-    /**
-     * Safely attempts to extract the base damage of a TaCZ gun using Reflection
-     * to avoid a hard compile-time dependency. If successful, appends the multiplied
-     * damage to the tooltip elements.
-     */
     public static void tryAddTaczDamageTooltip(ItemStack stack, float multiplier, List<com.mojang.datafixers.util.Either<net.minecraft.network.chat.FormattedText, net.minecraft.world.inventory.tooltip.TooltipComponent>> elements) {
+        // เช็คว่าโหลดมอด tacz มาหรือไม่ ถ้าไม่มีให้หยุดการทำงานทันที
         if (!ModList.get().isLoaded("tacz")) return;
 
         try {
-            // 1. Get IGun instance: IGun iGunObj = IGun.getIGunOrNull(stack);
             Class<?> iGunClass = Class.forName("com.tacz.guns.api.item.IGun");
             java.lang.reflect.Method getIGunOrNull = iGunClass.getMethod("getIGunOrNull", ItemStack.class);
             Object iGunObj = getIGunOrNull.invoke(null, stack);
             if (iGunObj == null) return;
 
-            // 2. Get Gun ID: ResourceLocation gunId = iGunObj.getGunId(stack);
+            Class<?> timelessApiClass = Class.forName("com.tacz.guns.api.TimelessAPI");
             java.lang.reflect.Method getGunId = iGunClass.getMethod("getGunId", ItemStack.class);
             net.minecraft.resources.ResourceLocation gunId = (net.minecraft.resources.ResourceLocation) getGunId.invoke(iGunObj, stack);
             if (gunId == null) return;
 
-            // 3. Get Gun Index: Optional<?> indexOpt = TimelessAPI.getCommonGunIndex(gunId);
-            Class<?> timelessApiClass = Class.forName("com.tacz.guns.api.TimelessAPI");
             java.lang.reflect.Method getCommonGunIndex = timelessApiClass.getMethod("getCommonGunIndex", net.minecraft.resources.ResourceLocation.class);
             java.util.Optional<?> indexOpt = (java.util.Optional<?>) getCommonGunIndex.invoke(null, gunId);
             if (!indexOpt.isPresent()) return;
             Object gunIndex = indexOpt.get();
 
-            // 4. Get Gun Data: Object gunData = gunIndex.getGunData();
             java.lang.reflect.Method getGunData = gunIndex.getClass().getMethod("getGunData");
             Object gunData = getGunData.invoke(gunIndex);
 
-            // 5. Search for Base Damage and Explosion Damage
             float baseDamage = -1;
             float explosionDamage = -1;
 
-            // วิธีที่ 1: ลองหา Method ที่รับ ItemStack และคืนค่า Damage ใน IGun
-            for (java.lang.reflect.Method m : iGunClass.getMethods()) {
-                if (m.getParameterCount() == 1 && m.getParameterTypes()[0] == ItemStack.class) {
-                    String name = m.getName().toLowerCase(java.util.Locale.US);
-                    if (name.contains("damage")) {
-                        try {
-                            Object result = m.invoke(iGunObj, stack);
-                            if (result instanceof Number) {
-                                float val = ((Number)result).floatValue();
-                                if (name.contains("explosion")) {
-                                    if (val > explosionDamage) explosionDamage = val;
-                                } else if (!name.contains("armor") && !name.contains("headshot")) {
-                                    if (val > baseDamage) baseDamage = val;
-                                }
-                            }
-                        } catch (Exception e) {}
-                    }
-                }
-            }
+            int pelletCount = -1;
 
-            // วิธีที่ 2: ลองหาใน TimelessAPI แบบ Static
-            if (baseDamage <= 0 || explosionDamage <= 0) {
-                for (java.lang.reflect.Method m : timelessApiClass.getMethods()) {
-                    if (java.lang.reflect.Modifier.isStatic(m.getModifiers()) && m.getParameterCount() == 1 && m.getParameterTypes()[0] == ItemStack.class) {
-                        String name = m.getName().toLowerCase(java.util.Locale.US);
-                        if (name.contains("damage")) {
-                            try {
-                                Object result = m.invoke(null, stack);
-                                if (result instanceof Number) {
-                                    float val = ((Number)result).floatValue();
-                                    if (name.contains("explosion") && val > explosionDamage) {
-                                        explosionDamage = val;
-                                    } else if (!name.contains("armor") && !name.contains("headshot") && val > baseDamage) {
-                                        baseDamage = val;
-                                    }
-                                }
-                            } catch (Exception e) {}
-                        }
-                    }
-                }
-            }
-
-            // วิธีที่ 3: ดึงข้อมูลจาก GunData ตรงๆ
+            // พยายามหาฟิลด์ดาเมจจาก GunData
             if (gunData != null) {
                 if (baseDamage <= 0) baseDamage = findSpecificDamageDeep(gunData, 0, false);
-                if (explosionDamage <= 0) explosionDamage = findSpecificDamageDeep(gunData, 0, true);
+                
+                Boolean isExplosive = isExplosiveDeep(gunData, 0);
+                boolean canExplode = false;
+                
+                if (isExplosive != null) {
+                    canExplode = isExplosive;
+                } else {
+                    canExplode = findExplosionRadiusDeep(gunData, 0) > 0;
+                }
+                
+                if (canExplode) {
+                    if (explosionDamage <= 0) explosionDamage = findSpecificDamageDeep(gunData, 0, true);
+                } else {
+                    explosionDamage = -1; // No explosion
+                }
+                
+                pelletCount = findPelletCountDeep(gunData, 0);
             }
 
-            // 6. แทรกข้อความ Pack-A-Punch
+            // ถ้าเจอดาเมจ ให้แทรกข้อมูลลงใน Tooltip
             if (baseDamage > 0 || explosionDamage > 0) {
                 String text = "Damage: ";
                 if (baseDamage > 0) {
+                    if (pelletCount > 1) {
+                        baseDamage = baseDamage / pelletCount;
+                    }
                     float packDamage = baseDamage * multiplier;
                     text += String.format(java.util.Locale.US, packDamage % 1.0 == 0 ? "%.0f" : "%.1f", packDamage);
+                    if (pelletCount > 1) {
+                        text += " × " + pelletCount;
+                    }
                 } else {
                     text += "0";
                 }
@@ -108,7 +81,6 @@ public class TaczIntegration {
 
                 Component newComp = Component.literal(text).withStyle(ChatFormatting.GREEN);
                 
-                // หาบรรทัด Damage Bonus เพื่อแทรกต่อท้าย
                 int insertIndex = elements.size();
                 for (int i = 0; i < elements.size(); i++) {
                     var element = elements.get(i);
@@ -122,12 +94,9 @@ public class TaczIntegration {
                     }
                 }
                 elements.add(insertIndex, com.mojang.datafixers.util.Either.left(newComp));
-            } else {
-                Component debugComp = Component.literal("Pack-A-Punch TaCZ Error: Damage field not found!").withStyle(ChatFormatting.RED);
-                elements.add(com.mojang.datafixers.util.Either.left(debugComp));
             }
         } catch (Throwable t) {
-            // ปล่อยผ่านเงียบๆ
+            // ถ้า Error ปล่อยผ่านเงียบๆ ไม่ให้เกมพัง
         }
     }
 
@@ -148,8 +117,15 @@ public class TaczIntegration {
                 boolean match = false;
                 
                 if (lookForExplosion) {
-                    if (name.contains("explosion") && name.contains("damage")) match = true;
-                    else if (clazz.getName().toLowerCase(java.util.Locale.US).contains("explosion") && name.contains("damage") && !name.contains("armor")) match = true;
+                    if (name.contains("explosion") && name.contains("damage") 
+                        && !name.contains("multiplier") && !name.contains("reduction") 
+                        && !name.contains("radius") && !name.contains("knockback")) {
+                        match = true;
+                    } else if (clazz.getName().toLowerCase(java.util.Locale.US).contains("explosion") 
+                        && name.contains("damage") && !name.contains("armor") 
+                        && !name.contains("multiplier") && !name.contains("reduction")) {
+                        match = true;
+                    }
                 } else {
                     if (name.contains("damage") && !name.contains("armor") && !name.contains("headshot") 
                         && !name.contains("multiplier") && !name.contains("reduction") 
@@ -172,13 +148,12 @@ public class TaczIntegration {
             }
         }
         
-        if (maxVal > 0) return maxVal;
+        if (maxVal >= 0) return maxVal;
         
         for (java.lang.reflect.Method m : clazz.getMethods()) {
             if (m.getParameterCount() == 0 && m.getDeclaringClass() != Object.class) {
                 String rType = m.getReturnType().getName().toLowerCase(java.util.Locale.US);
                 
-                // Recurse into any TaCZ class, or Optional
                 if ((rType.contains("tacz") || rType.contains("optional")) && !m.getReturnType().isEnum()) {
                     try {
                         Object result = m.invoke(obj);
@@ -189,5 +164,145 @@ public class TaczIntegration {
             }
         }
         return maxVal;
+    }
+
+    private static int findPelletCountDeep(Object obj, int depth) {
+        if (depth > 5 || obj == null) return -1;
+        if (obj instanceof java.util.Optional) {
+            java.util.Optional<?> opt = (java.util.Optional<?>) obj;
+            if (!opt.isPresent()) return -1;
+            obj = opt.get();
+        }
+        
+        int maxVal = -1;
+        Class<?> clazz = obj.getClass();
+        
+        for (java.lang.reflect.Method m : clazz.getMethods()) {
+            if (m.getParameterCount() == 0 && m.getDeclaringClass() != Object.class) {
+                String name = m.getName().toLowerCase(java.util.Locale.US);
+                
+                if ((name.contains("pellet") || name.contains("bullet") || name.contains("tracer") || name.contains("projectile")) 
+                    && (name.contains("count") || name.contains("amount") || name.contains("num"))) {
+                    try {
+                        Object result = m.invoke(obj);
+                        if (result instanceof Number) {
+                            int val = ((Number)result).intValue();
+                            if (val > maxVal) maxVal = val;
+                        }
+                    } catch (Exception e) {}
+                }
+            }
+        }
+        
+        if (maxVal > 1) return maxVal;
+        
+        for (java.lang.reflect.Method m : clazz.getMethods()) {
+            if (m.getParameterCount() == 0 && m.getDeclaringClass() != Object.class) {
+                String rType = m.getReturnType().getName().toLowerCase(java.util.Locale.US);
+                
+                if ((rType.contains("tacz") || rType.contains("optional")) && !m.getReturnType().isEnum()) {
+                    try {
+                        Object result = m.invoke(obj);
+                        int count = findPelletCountDeep(result, depth + 1);
+                        if (count > maxVal) maxVal = count;
+                    } catch (Exception e) {}
+                }
+            }
+        }
+        return maxVal;
+    }
+
+    private static float findExplosionRadiusDeep(Object obj, int depth) {
+        if (depth > 5 || obj == null) return -1;
+        if (obj instanceof java.util.Optional) {
+            java.util.Optional<?> opt = (java.util.Optional<?>) obj;
+            if (!opt.isPresent()) return -1;
+            obj = opt.get();
+        }
+        
+        float maxVal = -1;
+        Class<?> clazz = obj.getClass();
+        
+        for (java.lang.reflect.Method m : clazz.getMethods()) {
+            if (m.getParameterCount() == 0 && m.getDeclaringClass() != Object.class) {
+                String name = m.getName().toLowerCase(java.util.Locale.US);
+                
+                if (name.contains("radius") && (name.contains("explosion") || clazz.getName().toLowerCase(java.util.Locale.US).contains("explosion"))) {
+                    try {
+                        Object result = m.invoke(obj);
+                        if (result instanceof Number) {
+                            float val = ((Number)result).floatValue();
+                            if (val > maxVal) maxVal = val;
+                        }
+                    } catch (Exception e) {}
+                }
+            }
+        }
+        
+        if (maxVal >= 0) return maxVal;
+        
+        for (java.lang.reflect.Method m : clazz.getMethods()) {
+            if (m.getParameterCount() == 0 && m.getDeclaringClass() != Object.class) {
+                String rType = m.getReturnType().getName().toLowerCase(java.util.Locale.US);
+                if ((rType.contains("tacz") || rType.contains("optional")) && !m.getReturnType().isEnum()) {
+                    try {
+                        Object result = m.invoke(obj);
+                        float radius = findExplosionRadiusDeep(result, depth + 1);
+                        if (radius > maxVal) maxVal = radius;
+                    } catch (Exception e) {}
+                }
+            }
+        }
+        return maxVal;
+    }
+
+    private static Boolean isExplosiveDeep(Object obj, int depth) {
+        if (depth > 5 || obj == null) return null;
+        if (obj instanceof java.util.Optional) {
+            java.util.Optional<?> opt = (java.util.Optional<?>) obj;
+            if (!opt.isPresent()) return false;
+            obj = opt.get();
+        }
+        
+        Class<?> clazz = obj.getClass();
+        Boolean foundExplicitFalse = false;
+        
+        for (java.lang.reflect.Method m : clazz.getMethods()) {
+            if (m.getParameterCount() == 0 && m.getDeclaringClass() != Object.class) {
+                String name = m.getName().toLowerCase(java.util.Locale.US);
+                if (name.equals("isexplode") || name.equals("hasexplosion")) {
+                    try {
+                        Object result = m.invoke(obj);
+                        if (result instanceof Boolean) {
+                            if ((Boolean) result) {
+                                return true;
+                            } else {
+                                foundExplicitFalse = true;
+                            }
+                        }
+                    } catch (Exception e) {}
+                }
+            }
+        }
+        
+        if (foundExplicitFalse) return false;
+        
+        Boolean anyTrue = null;
+        for (java.lang.reflect.Method m : clazz.getMethods()) {
+            if (m.getParameterCount() == 0 && m.getDeclaringClass() != Object.class) {
+                String rType = m.getReturnType().getName().toLowerCase(java.util.Locale.US);
+                if ((rType.contains("tacz") || rType.contains("optional")) && !m.getReturnType().isEnum()) {
+                    try {
+                        Object result = m.invoke(obj);
+                        Boolean childExplosive = isExplosiveDeep(result, depth + 1);
+                        if (childExplosive != null) {
+                            if (childExplosive) return true;
+                            anyTrue = false;
+                        }
+                    } catch (Exception e) {}
+                }
+            }
+        }
+        return anyTrue;
     }
 }

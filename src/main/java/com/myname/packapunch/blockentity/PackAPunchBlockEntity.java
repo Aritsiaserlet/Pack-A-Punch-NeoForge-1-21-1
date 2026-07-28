@@ -81,6 +81,9 @@ public class PackAPunchBlockEntity extends BlockEntity implements MenuProvider {
     public static final int DATA_COUNT         = 1;
     public static final int DATA_UPGRADE_LEVEL = 0;
 
+    /** Maximum upgrade level — will be moved to config later */
+
+
     // ─────────────────────────────────────────────────────────
     //  FIELDS
     // ─────────────────────────────────────────────────────────
@@ -343,6 +346,17 @@ public class PackAPunchBlockEntity extends BlockEntity implements MenuProvider {
             return;
         }
 
+        // ── VALIDATION 1.5: Config Mod Whitelist ────────────────────────
+        net.minecraft.resources.ResourceLocation itemId = net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(gunStack.getItem());
+        if (itemId != null) {
+            String modId = itemId.getNamespace();
+            java.util.List<? extends String> allowedMods = com.myname.packapunch.config.ModConfig.ALLOWED_MODS.get();
+            if (!allowedMods.isEmpty() && !allowedMods.contains(modId)) {
+                sendHint(player, "× This item's mod is not allowed to be Pack-a-Punched!", ChatFormatting.RED);
+                return;
+            }
+        }
+
         // ── VALIDATION 2: Read current upgrade level from Data Component ──
         // stack.get() returns null if the component is absent (never been upgraded).
         // We treat null as level 0 (unupgraded).
@@ -355,19 +369,22 @@ public class PackAPunchBlockEntity extends BlockEntity implements MenuProvider {
             return;
         }
 
-        // ── VALIDATION 4: Payment — correct item and sufficient count ───
+        // ── VALIDATION 4: Payment — check player inventory ───
         int nextLevel = currentLevel + 1;
         net.minecraft.world.item.Item requiredItem = com.myname.packapunch.UpgradeConfig.getItemForLevel(nextLevel);
         int cost = com.myname.packapunch.UpgradeConfig.getCostForLevel(nextLevel);
+        String itemName = requiredItem.getDescription().getString();
 
-        int count = 0;
-        for (int i = 0; i < player.getInventory().getContainerSize(); i++) {
-            ItemStack invStack = player.getInventory().getItem(i);
-            if (invStack.is(requiredItem)) count += invStack.getCount();
+        int available = 0;
+        Inventory playerInv = player.getInventory();
+        for (int i = 0; i < playerInv.getContainerSize(); i++) {
+            ItemStack stack = playerInv.getItem(i);
+            if (stack.is(requiredItem)) {
+                available += stack.getCount();
+            }
         }
 
-        if (count < cost) {
-            String itemName = requiredItem.getDescription().getString();
+        if (available < cost) {
             sendHint(player,
                     "× Need " + cost + " " + itemName + " for Level " + nextLevel + "!",
                     ChatFormatting.RED);
@@ -379,14 +396,13 @@ public class PackAPunchBlockEntity extends BlockEntity implements MenuProvider {
         // ────────────────────────────────────────────────────────
 
         // STEP 1: Consume items from player inventory
-        int remainingCost = cost;
-        for (int i = 0; i < player.getInventory().getContainerSize(); i++) {
-            ItemStack invStack = player.getInventory().getItem(i);
-            if (invStack.is(requiredItem)) {
-                int shrinkBy = Math.min(remainingCost, invStack.getCount());
-                invStack.shrink(shrinkBy);
-                remainingCost -= shrinkBy;
-                if (remainingCost <= 0) break;
+        int remainingToConsume = cost;
+        for (int i = 0; i < playerInv.getContainerSize() && remainingToConsume > 0; i++) {
+            ItemStack stack = playerInv.getItem(i);
+            if (stack.is(requiredItem)) {
+                int take = Math.min(stack.getCount(), remainingToConsume);
+                stack.shrink(take);
+                remainingToConsume -= take;
             }
         }
 
@@ -397,7 +413,6 @@ public class PackAPunchBlockEntity extends BlockEntity implements MenuProvider {
         gunStack.set(ModDataComponents.UPGRADE_LEVEL.get(), new UpgradeLevelComponent(newLevel));
 
         // STEP 4: Mark dirty + push block update.
-        // extractItem already triggered onContentsChanged for the payment slot.
         // The gun slot was modified in-place, so we need a manual setChanged().
         setChanged();
         level.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), 3);

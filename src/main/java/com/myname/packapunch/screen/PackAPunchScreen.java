@@ -245,6 +245,18 @@ public class PackAPunchScreen extends AbstractContainerScreen<PackAPunchMenu> {
             return;
         }
 
+        // 1.5. Mod Whitelist
+        net.minecraft.resources.ResourceLocation itemId = net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(gunStack.getItem());
+        if (itemId != null) {
+            String modId = itemId.getNamespace();
+            java.util.List<? extends String> allowedMods = com.myname.packapunch.config.ModConfig.ALLOWED_MODS.get();
+            if (!allowedMods.isEmpty() && !allowedMods.contains(modId)) {
+                upgradeButton.setMessage(Component.literal("× NOT ALLOWED"));
+                upgradeButton.active = false;
+                return;
+            }
+        }
+
         // 2. Max Level
         int level = this.menu.getUpgradeLevel();
         if (com.myname.packapunch.UpgradeConfig.isMaxLevel(level)) {
@@ -258,16 +270,18 @@ public class PackAPunchScreen extends AbstractContainerScreen<PackAPunchMenu> {
         net.minecraft.world.item.Item requiredItem = com.myname.packapunch.UpgradeConfig.getItemForLevel(nextLevel);
         int nextCost = com.myname.packapunch.UpgradeConfig.getCostForLevel(nextLevel);
 
-        int count = 0;
-        net.minecraft.world.entity.player.Inventory playerInv = net.minecraft.client.Minecraft.getInstance().player.getInventory();
-        for (int i = 0; i < playerInv.getContainerSize(); i++) {
-            ItemStack invStack = playerInv.getItem(i);
-            if (invStack.is(requiredItem)) {
-                count += invStack.getCount();
+        int available = 0;
+        if (this.minecraft != null && this.minecraft.player != null) {
+            Inventory playerInv = this.minecraft.player.getInventory();
+            for (int i = 0; i < playerInv.getContainerSize(); i++) {
+                ItemStack stack = playerInv.getItem(i);
+                if (stack.is(requiredItem)) {
+                    available += stack.getCount();
+                }
             }
         }
 
-        if (count < nextCost) {
+        if (available < nextCost) {
             String itemName = requiredItem.getDescription().getString();
             upgradeButton.setMessage(Component.literal("NEED " + nextCost + " " + itemName));
             upgradeButton.active = false;
@@ -389,20 +403,42 @@ public class PackAPunchScreen extends AbstractContainerScreen<PackAPunchMenu> {
         // ── Next Upgrade Requirement — fully driven by UpgradeConfig ────────────────
         // This mirrors exactly what the server will validate in tryUpgrade().
         // The client NEVER assumes any item type independently.
-        if (!com.myname.packapunch.UpgradeConfig.isMaxLevel(level)) {
-            int nextLevel = level + 1;
-            net.minecraft.world.item.Item reqItem = com.myname.packapunch.UpgradeConfig.getItemForLevel(nextLevel);
-            int reqCost = com.myname.packapunch.UpgradeConfig.getCostForLevel(nextLevel);
-            String reqName = reqItem.getDescription().getString();
-            String reqText = "Cost: " + reqCost + "x " + reqName;
-            int reqX = (this.imageWidth / 2) - (this.font.width(reqText) / 2);
-            graphics.drawString(this.font, reqText, reqX, 70, 0x55FFFF, true);
-        } else {
-            String maxText = "✦ MAX LEVEL REACHED";
-            int maxX = (this.imageWidth / 2) - (this.font.width(maxText) / 2);
-            graphics.drawString(this.font, maxText, maxX, 70, 0xFF55FF, true);
+        
+        ItemStack gunStack = this.menu.getSlot(0).getItem();
+        boolean modAllowed = true;
+        if (!gunStack.isEmpty()) {
+            net.minecraft.resources.ResourceLocation itemId = net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(gunStack.getItem());
+            if (itemId != null) {
+                String modId = itemId.getNamespace();
+                java.util.List<? extends String> allowedMods = com.myname.packapunch.config.ModConfig.ALLOWED_MODS.get();
+                if (!allowedMods.isEmpty() && !allowedMods.contains(modId)) {
+                    modAllowed = false;
+                    String errorText = "× This item's mod is not allowed!";
+                    int ex = (this.imageWidth / 2) - (this.font.width(errorText) / 2);
+                    graphics.drawString(this.font, errorText, ex, 70, 0xFF5555, true);
+                }
+            }
         }
 
+        if (modAllowed) {
+            if (!com.myname.packapunch.UpgradeConfig.isMaxLevel(level)) {
+                int nextLevel = level + 1;
+                net.minecraft.world.item.Item reqItem = com.myname.packapunch.UpgradeConfig.getItemForLevel(nextLevel);
+                int reqCost = com.myname.packapunch.UpgradeConfig.getCostForLevel(nextLevel);
+                String reqName = reqItem.getDescription().getString();
+                String reqText = "Cost: " + reqCost + "x " + reqName;
+                int reqX = (this.imageWidth / 2) - (this.font.width(reqText) / 2);
+                graphics.drawString(this.font, reqText, reqX, 70, 0x55FFFF, true);
+            } else {
+                String maxText = "✦ MAX LEVEL REACHED";
+                int maxX = (this.imageWidth / 2) - (this.font.width(maxText) / 2);
+                graphics.drawString(this.font, maxText, maxX, 70, 0xFF55FF, true);
+            }
+        }
 
+        // ── Slot Labels ────────────────────────────────────────────────────
+        // Small labels above each slot to explain their purpose.
+        graphics.drawString(this.font, "Weapon",
+                70, 25, COLOR_LIGHT_GRAY, false);
     }
 }
