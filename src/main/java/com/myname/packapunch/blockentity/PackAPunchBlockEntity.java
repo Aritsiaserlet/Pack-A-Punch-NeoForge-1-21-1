@@ -406,6 +406,10 @@ public class PackAPunchBlockEntity extends BlockEntity implements MenuProvider {
             }
         }
 
+        if (player.isCreative()) {
+            canAfford = true;
+        }
+
         if (!canAfford) {
             sendHint(player,
                     "× Need " + cost + " " + requirementName + " for Level " + nextLevel + "!",
@@ -417,31 +421,33 @@ public class PackAPunchBlockEntity extends BlockEntity implements MenuProvider {
         // ALL VALIDATIONS PASSED — perform the upgrade atomically
         // ────────────────────────────────────────────────────────
 
-        // STEP 1: Consume cost
-        switch (tier.getCurrencyType()) {
-            case ITEM -> {
-                net.minecraft.world.item.Item requiredItem = com.myname.packapunch.UpgradeConfig.getItemForLevel(nextLevel);
-                int remainingToConsume = cost;
-                Inventory playerInv = player.getInventory();
-                for (int i = 0; i < playerInv.getContainerSize() && remainingToConsume > 0; i++) {
-                    ItemStack stack = playerInv.getItem(i);
-                    if (stack.is(requiredItem)) {
-                        int take = Math.min(stack.getCount(), remainingToConsume);
-                        stack.shrink(take);
-                        remainingToConsume -= take;
+        // STEP 1: Consume cost (skip if creative)
+        if (!player.isCreative()) {
+            switch (tier.getCurrencyType()) {
+                case ITEM -> {
+                    net.minecraft.world.item.Item requiredItem = com.myname.packapunch.UpgradeConfig.getItemForLevel(nextLevel);
+                    int remainingToConsume = cost;
+                    Inventory playerInv = player.getInventory();
+                    for (int i = 0; i < playerInv.getContainerSize() && remainingToConsume > 0; i++) {
+                        ItemStack stack = playerInv.getItem(i);
+                        if (stack.is(requiredItem)) {
+                            int take = Math.min(stack.getCount(), remainingToConsume);
+                            stack.shrink(take);
+                            remainingToConsume -= take;
+                        }
                     }
                 }
-            }
-            case SCOREBOARD -> {
-                net.minecraft.world.scores.Scoreboard scoreboard = player.getScoreboard();
-                net.minecraft.world.scores.Objective objective = scoreboard.getObjective(tier.getId());
-                if (objective != null) {
-                    net.minecraft.world.scores.ScoreAccess score = scoreboard.getOrCreatePlayerScore(player, objective);
-                    score.set(score.get() - cost);
+                case SCOREBOARD -> {
+                    net.minecraft.world.scores.Scoreboard scoreboard = player.getScoreboard();
+                    net.minecraft.world.scores.Objective objective = scoreboard.getObjective(tier.getId());
+                    if (objective != null) {
+                        net.minecraft.world.scores.ScoreAccess score = scoreboard.getOrCreatePlayerScore(player, objective);
+                        score.set(score.get() - cost);
+                    }
                 }
-            }
-            case XP -> {
-                player.giveExperienceLevels(-cost);
+                case XP -> {
+                    player.giveExperienceLevels(-cost);
+                }
             }
         }
 

@@ -308,6 +308,10 @@ public class PackAPunchScreen extends AbstractContainerScreen<PackAPunchMenu> {
             }
         }
 
+        if (this.minecraft != null && this.minecraft.player != null && this.minecraft.player.isCreative()) {
+            canAfford = true;
+        }
+
         if (!canAfford) {
             upgradeButton.setMessage(Component.literal("NEED " + nextCost + " " + requirementName));
             upgradeButton.active = false;
