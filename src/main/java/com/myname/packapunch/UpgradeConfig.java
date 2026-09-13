@@ -2,80 +2,85 @@ package com.myname.packapunch;
 
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.Items;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * ╔══════════════════════════════════════════════════════════╗
  * ║        UPGRADECONFIG — SINGLE SOURCE OF TRUTH           ║
  * ╚══════════════════════════════════════════════════════════╝
  *
- * This class acts as the centralized configuration for all upgrade
- * progression logic, costs, and multipliers.
- *
- * It guarantees that GUI text, server validation, and tooltip rendering
- * always use the same values without duplicating magic numbers across
- * the codebase.
+ * Parses and serves upgrade data from ModConfig.UPGRADES.
  */
 public class UpgradeConfig {
-    // ─────────────────────────────────────────────────────────
-    //  HELPER METHODS (With Safe Fallbacks)
-    // ─────────────────────────────────────────────────────────
+
+    private static List<UpgradeTier> cachedTiers = null;
+    private static int lastConfigHash = -1;
+
+    private static void refreshCacheIfNeeded() {
+        List<? extends String> rawList = com.myname.packapunch.config.ModConfig.UPGRADES.get();
+        int currentHash = rawList.hashCode();
+        
+        if (cachedTiers == null || lastConfigHash != currentHash) {
+            cachedTiers = new ArrayList<>();
+            for (String entry : rawList) {
+                try {
+                    String[] parts = entry.split(";");
+                    if (parts.length >= 4) {
+                        UpgradeTier.CurrencyType type = UpgradeTier.CurrencyType.valueOf(parts[0].trim().toUpperCase());
+                        String id = parts[1].trim();
+                        int cost = Integer.parseInt(parts[2].trim());
+                        float multiplier = Float.parseFloat(parts[3].trim());
+                        cachedTiers.add(new UpgradeTier(type, id, cost, multiplier));
+                    }
+                } catch (Exception e) {
+                    PackAPunchMod.LOGGER.error("[UpgradeConfig] Failed to parse upgrade entry: " + entry, e);
+                }
+            }
+            lastConfigHash = currentHash;
+        }
+    }
 
     public static int getMaxLevel() {
-        return com.myname.packapunch.config.ModConfig.MAX_LEVEL.get();
+        refreshCacheIfNeeded();
+        return cachedTiers.size();
     }
 
     public static boolean isMaxLevel(int level) {
         return level >= getMaxLevel();
     }
 
-    public static Item getItemForLevel(int nextLevel) {
+    public static UpgradeTier getTier(int level) {
+        refreshCacheIfNeeded();
         int max = getMaxLevel();
-        if (nextLevel < 1 || nextLevel > max) {
-            PackAPunchMod.LOGGER.error("[UpgradeConfig] Invalid nextLevel {} for getItemForLevel. Falling back to default.", nextLevel);
-            return Items.DIAMOND_BLOCK; // Safe fallback
+        if (level < 1 || level > max) {
+            // Fallback for safety
+            return new UpgradeTier(UpgradeTier.CurrencyType.ITEM, "minecraft:diamond_block", 999, 1.0f);
         }
-        
-        java.util.List<? extends String> items = com.myname.packapunch.config.ModConfig.UPGRADE_ITEMS.get();
-        if (nextLevel - 1 < items.size()) {
-            net.minecraft.resources.ResourceLocation rl = net.minecraft.resources.ResourceLocation.tryParse(items.get(nextLevel - 1));
+        return cachedTiers.get(level - 1);
+    }
+
+    // Retained for backward compatibility with existing code where possible
+    public static Item getItemForLevel(int nextLevel) {
+        UpgradeTier tier = getTier(nextLevel);
+        if (tier.getCurrencyType() == UpgradeTier.CurrencyType.ITEM) {
+            net.minecraft.resources.ResourceLocation rl = net.minecraft.resources.ResourceLocation.tryParse(tier.getId());
             if (rl != null) {
                 Item item = net.minecraft.core.registries.BuiltInRegistries.ITEM.get(rl);
-                if (item != Items.AIR) {
+                if (item != null && item != Items.AIR) {
                     return item;
                 }
             }
         }
-        PackAPunchMod.LOGGER.error("[UpgradeConfig] Could not parse item for level {}. Falling back to default.", nextLevel);
-        return Items.DIAMOND_BLOCK;
+        return Items.DIAMOND_BLOCK; // Safe fallback
     }
 
     public static int getCostForLevel(int nextLevel) {
-        int max = getMaxLevel();
-        if (nextLevel < 1 || nextLevel > max) {
-            PackAPunchMod.LOGGER.error("[UpgradeConfig] Invalid nextLevel {} for getCostForLevel. Falling back to default.", nextLevel);
-            return 999; // Safe fallback (unaffordable to prevent exploits)
-        }
-        
-        java.util.List<? extends Integer> costs = com.myname.packapunch.config.ModConfig.UPGRADE_COSTS.get();
-        if (nextLevel - 1 < costs.size()) {
-            return costs.get(nextLevel - 1);
-        }
-        PackAPunchMod.LOGGER.error("[UpgradeConfig] Could not find cost for level {}. Falling back to 999.", nextLevel);
-        return 999;
+        return getTier(nextLevel).getCost();
     }
 
     public static float getMultiplierForLevel(int level) {
-        int max = getMaxLevel();
-        if (level < 0 || level > max) {
-            PackAPunchMod.LOGGER.error("[UpgradeConfig] Invalid level {} for getMultiplierForLevel. Falling back to 1.0f.", level);
-            return 1.0f; // Safe fallback (no bonus multiplier)
-        }
-        
-        java.util.List<? extends Double> multipliers = com.myname.packapunch.config.ModConfig.DAMAGE_MULTIPLIERS.get();
-        if (level < multipliers.size()) {
-            return multipliers.get(level).floatValue();
-        }
-        PackAPunchMod.LOGGER.error("[UpgradeConfig] Could not find multiplier for level {}. Falling back to 1.0f.", level);
-        return 1.0f;
+        if (level <= 0) return 1.0f; // Base level
+        return getTier(level).getMultiplier();
     }
 }

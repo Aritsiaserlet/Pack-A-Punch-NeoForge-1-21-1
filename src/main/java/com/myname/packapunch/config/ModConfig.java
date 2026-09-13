@@ -12,10 +12,7 @@ public class ModConfig {
 
     public static final ModConfigSpec.ConfigValue<List<? extends String>> ALLOWED_MODS;
     
-    public static final ModConfigSpec.IntValue MAX_LEVEL;
-    public static final ModConfigSpec.ConfigValue<List<? extends String>> UPGRADE_ITEMS;
-    public static final ModConfigSpec.ConfigValue<List<? extends Integer>> UPGRADE_COSTS;
-    public static final ModConfigSpec.ConfigValue<List<? extends Double>> DAMAGE_MULTIPLIERS;
+    public static final ModConfigSpec.ConfigValue<List<? extends String>> UPGRADES;
 
     static {
         BUILDER.push("General");
@@ -30,27 +27,22 @@ public class ModConfig {
         
         BUILDER.push("Progression");
         
-        MAX_LEVEL = BUILDER
-                .comment("The maximum upgrade level a weapon can reach.")
-                .defineInRange("maxLevel", 3, 1, 100);
-                
-        UPGRADE_ITEMS = BUILDER
-                .comment("List of items required for each upgrade level (Index 0 = Level 1).",
-                         "Must have at least 'maxLevel' elements.")
-                .defineListAllowEmpty("upgradeItems", List.of(
-                        "minecraft:diamond_block",
-                        "minecraft:diamond_block",
-                        "minecraft:netherite_block"
+        UPGRADES = BUILDER
+                .comment(
+                        "List of upgrades. You can add as many as you want.",
+                        "The maximum level is determined automatically by the number of entries here.",
+                        "",
+                        "Format: <TYPE>;<ID_OR_NAME>;<COST>;<MULTIPLIER>",
+                        "Supported Types:",
+                        "  - ITEM: Requires a specific item. (e.g., ITEM;minecraft:diamond_block;12;1.2)",
+                        "  - SCOREBOARD: Requires a scoreboard score. (e.g., SCOREBOARD;money;500;1.5)",
+                        "  - XP: Requires experience levels. (e.g., XP;none;30;2.0)"
+                )
+                .defineListAllowEmpty("upgrades", List.of(
+                        "ITEM;minecraft:diamond_block;12;1.2",
+                        "ITEM;minecraft:diamond_block;24;1.5",
+                        "ITEM;minecraft:netherite_block;2;2.0"
                 ), obj -> obj instanceof String);
-                
-        UPGRADE_COSTS = BUILDER
-                .comment("List of item costs for each upgrade level.")
-                .defineListAllowEmpty("upgradeCosts", List.of(12, 24, 2), obj -> obj instanceof Integer);
-                
-        DAMAGE_MULTIPLIERS = BUILDER
-                .comment("Damage multipliers for each level. Index 0 is base (Level 0), Index 1 is Level 1, etc.",
-                         "Must have at least 'maxLevel + 1' elements.")
-                .defineListAllowEmpty("damageMultipliers", List.of(1.0, 1.2, 1.5, 2.0), obj -> obj instanceof Double || obj instanceof Float || obj instanceof Integer);
 
         BUILDER.pop();
         

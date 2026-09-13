@@ -149,12 +149,24 @@ public class TooltipHandler {
                     Component.literal("MAX LEVEL")
                             .withStyle(ChatFormatting.LIGHT_PURPLE, ChatFormatting.ITALIC));
         } else {
-            int nextCost = com.myname.packapunch.UpgradeConfig.getCostForLevel(level + 1);
-            net.minecraft.world.item.Item reqItem = com.myname.packapunch.UpgradeConfig.getItemForLevel(level + 1);
-            String reqItemName = reqItem.getDescription().getString();
+            int nextLevel = level + 1;
+            com.myname.packapunch.UpgradeTier tier = com.myname.packapunch.UpgradeConfig.getTier(nextLevel);
+            int nextCost = tier.getCost();
+            String reqName = "";
+            switch (tier.getCurrencyType()) {
+                case ITEM -> {
+                    reqName = com.myname.packapunch.UpgradeConfig.getItemForLevel(nextLevel).getDescription().getString();
+                }
+                case SCOREBOARD -> {
+                    reqName = tier.getId() + " (Score)";
+                }
+                case XP -> {
+                    reqName = "Levels";
+                }
+            }
             
             event.getToolTip().add(insertIndex,
-                    Component.literal(nextCost + " " + reqItemName)
+                    Component.literal(nextCost + " " + reqName)
                             .withStyle(ChatFormatting.AQUA));
         }
     }

@@ -267,23 +267,49 @@ public class PackAPunchScreen extends AbstractContainerScreen<PackAPunchMenu> {
 
         // 3. Insufficient Payment
         int nextLevel = level + 1;
-        net.minecraft.world.item.Item requiredItem = com.myname.packapunch.UpgradeConfig.getItemForLevel(nextLevel);
-        int nextCost = com.myname.packapunch.UpgradeConfig.getCostForLevel(nextLevel);
+        com.myname.packapunch.UpgradeTier tier = com.myname.packapunch.UpgradeConfig.getTier(nextLevel);
+        int nextCost = tier.getCost();
 
-        int available = 0;
-        if (this.minecraft != null && this.minecraft.player != null) {
-            Inventory playerInv = this.minecraft.player.getInventory();
-            for (int i = 0; i < playerInv.getContainerSize(); i++) {
-                ItemStack stack = playerInv.getItem(i);
-                if (stack.is(requiredItem)) {
-                    available += stack.getCount();
+        boolean canAfford = false;
+        String requirementName = "";
+
+        switch (tier.getCurrencyType()) {
+            case ITEM -> {
+                net.minecraft.world.item.Item requiredItem = com.myname.packapunch.UpgradeConfig.getItemForLevel(nextLevel);
+                requirementName = requiredItem.getDescription().getString();
+                int available = 0;
+                if (this.minecraft != null && this.minecraft.player != null) {
+                    Inventory playerInv = this.minecraft.player.getInventory();
+                    for (int i = 0; i < playerInv.getContainerSize(); i++) {
+                        ItemStack stack = playerInv.getItem(i);
+                        if (stack.is(requiredItem)) {
+                            available += stack.getCount();
+                        }
+                    }
+                }
+                canAfford = available >= nextCost;
+            }
+            case SCOREBOARD -> {
+                requirementName = tier.getId() + " (Score)";
+                if (this.minecraft != null && this.minecraft.player != null) {
+                    net.minecraft.world.scores.Scoreboard scoreboard = this.minecraft.level.getScoreboard();
+                    net.minecraft.world.scores.Objective objective = scoreboard.getObjective(tier.getId());
+                    if (objective != null) {
+                        net.minecraft.world.scores.ScoreAccess score = scoreboard.getOrCreatePlayerScore(this.minecraft.player, objective);
+                        canAfford = score.get() >= nextCost;
+                    }
+                }
+            }
+            case XP -> {
+                requirementName = "Levels";
+                if (this.minecraft != null && this.minecraft.player != null) {
+                    canAfford = this.minecraft.player.experienceLevel >= nextCost;
                 }
             }
         }
 
-        if (available < nextCost) {
-            String itemName = requiredItem.getDescription().getString();
-            upgradeButton.setMessage(Component.literal("NEED " + nextCost + " " + itemName));
+        if (!canAfford) {
+            upgradeButton.setMessage(Component.literal("NEED " + nextCost + " " + requirementName));
             upgradeButton.active = false;
             return;
         }
@@ -423,9 +449,20 @@ public class PackAPunchScreen extends AbstractContainerScreen<PackAPunchMenu> {
         if (modAllowed) {
             if (!com.myname.packapunch.UpgradeConfig.isMaxLevel(level)) {
                 int nextLevel = level + 1;
-                net.minecraft.world.item.Item reqItem = com.myname.packapunch.UpgradeConfig.getItemForLevel(nextLevel);
-                int reqCost = com.myname.packapunch.UpgradeConfig.getCostForLevel(nextLevel);
-                String reqName = reqItem.getDescription().getString();
+                com.myname.packapunch.UpgradeTier tier = com.myname.packapunch.UpgradeConfig.getTier(nextLevel);
+                int reqCost = tier.getCost();
+                String reqName = "";
+                switch (tier.getCurrencyType()) {
+                    case ITEM -> {
+                        reqName = com.myname.packapunch.UpgradeConfig.getItemForLevel(nextLevel).getDescription().getString();
+                    }
+                    case SCOREBOARD -> {
+                        reqName = tier.getId() + " (Score)";
+                    }
+                    case XP -> {
+                        reqName = "Levels";
+                    }
+                }
                 String reqText = "Cost: " + reqCost + "x " + reqName;
                 int reqX = (this.imageWidth / 2) - (this.font.width(reqText) / 2);
                 graphics.drawString(this.font, reqText, reqX, 70, 0x55FFFF, true);
