@@ -109,6 +109,7 @@ public class PackAPunchMod {
         // ── Subscribe to mod-loading events ─────────────────────
         modEventBus.addListener(this::onCommonSetup);
         modEventBus.addListener(this::onRegisterPayloads);
+        net.neoforged.neoforge.common.NeoForge.EVENT_BUS.addListener(this::onPlayerJoin);
 
         LOGGER.info("[PackAPunch] Mod loaded successfully!");
     }
@@ -116,6 +117,14 @@ public class PackAPunchMod {
     // ─────────────────────────────────────────────────────────
     //  EVENT HANDLERS
     // ─────────────────────────────────────────────────────────
+
+    private void onPlayerJoin(net.neoforged.neoforge.event.entity.player.PlayerEvent.PlayerLoggedInEvent event) {
+        if (event.getEntity() instanceof net.minecraft.server.level.ServerPlayer serverPlayer) {
+            java.util.List<String> upgrades = new java.util.ArrayList<>(com.myname.packapunch.config.ModConfig.UPGRADES.get());
+            net.neoforged.neoforge.network.PacketDistributor.sendToPlayer(serverPlayer, 
+                new com.myname.packapunch.network.ClientboundSyncConfigPacket(upgrades));
+        }
+    }
 
     /**
      * Common Setup — runs on BOTH server and client after all registries
@@ -162,6 +171,11 @@ public class PackAPunchMod {
                         ServerboundUpgradePacket.TYPE,         // packet identity
                         ServerboundUpgradePacket.STREAM_CODEC, // network codec
                         ServerboundUpgradePacket::handle       // server handler
+                )
+                .playToClient(
+                        com.myname.packapunch.network.ClientboundSyncConfigPacket.TYPE,
+                        com.myname.packapunch.network.ClientboundSyncConfigPacket.STREAM_CODEC,
+                        com.myname.packapunch.network.ClientboundSyncConfigPacket::handle
                 );
 
         LOGGER.info("[PackAPunch] Network payloads registered.");

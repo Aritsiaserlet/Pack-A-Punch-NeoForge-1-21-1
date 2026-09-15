@@ -16,9 +16,19 @@ public class UpgradeConfig {
 
     private static List<UpgradeTier> cachedTiers = null;
     private static int lastConfigHash = -1;
+    
+    // Stores the list sent by the server. If null, we use the local config.
+    private static List<String> serverSyncedUpgrades = null;
+
+    public static void syncFromServer(List<String> upgrades) {
+        serverSyncedUpgrades = upgrades;
+        lastConfigHash = -1; // Force refresh
+        refreshCacheIfNeeded();
+        com.myname.packapunch.PackAPunchMod.LOGGER.info("[PackAPunch] Synced config from server!");
+    }
 
     private static void refreshCacheIfNeeded() {
-        List<? extends String> rawList = com.myname.packapunch.config.ModConfig.UPGRADES.get();
+        List<? extends String> rawList = serverSyncedUpgrades != null ? serverSyncedUpgrades : com.myname.packapunch.config.ModConfig.UPGRADES.get();
         int currentHash = rawList.hashCode();
         
         if (cachedTiers == null || lastConfigHash != currentHash) {
