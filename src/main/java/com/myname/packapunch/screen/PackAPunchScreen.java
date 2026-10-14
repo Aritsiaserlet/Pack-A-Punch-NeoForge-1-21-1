@@ -306,6 +306,12 @@ public class PackAPunchScreen extends AbstractContainerScreen<PackAPunchMenu> {
                     canAfford = this.minecraft.player.experienceLevel >= nextCost;
                 }
             }
+            case ZOMBIEMOD -> {
+                requirementName = (tier.getId().isEmpty() || tier.getId().equalsIgnoreCase("none")) ? "Zombie Points" : tier.getId();
+                if (this.minecraft != null && this.minecraft.player != null) {
+                    canAfford = com.myname.packapunch.compat.ZombieModIntegration.getPoints(this.minecraft.player) >= nextCost;
+                }
+            }
         }
 
         if (this.minecraft != null && this.minecraft.player != null && this.minecraft.player.isCreative()) {
@@ -465,6 +471,9 @@ public class PackAPunchScreen extends AbstractContainerScreen<PackAPunchMenu> {
                     }
                     case XP -> {
                         reqName = "Levels";
+                    }
+                    case ZOMBIEMOD -> {
+                        reqName = (tier.getId().isEmpty() || tier.getId().equalsIgnoreCase("none")) ? "Zombie Points" : tier.getId();
                     }
                 }
                 String reqText = "Cost: " + reqCost + "x " + reqName;

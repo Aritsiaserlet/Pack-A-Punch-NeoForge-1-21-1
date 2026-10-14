@@ -36,7 +36,8 @@ public class ModConfig {
                         "Supported Types:",
                         "  - ITEM: Requires a specific item. (e.g., ITEM;minecraft:diamond_block;12;1.2)",
                         "  - SCOREBOARD: Requires a scoreboard score. (e.g., SCOREBOARD;money;500;1.5)",
-                        "  - XP: Requires experience levels. (e.g., XP;none;30;2.0)"
+                        "  - XP: Requires experience levels. (e.g., XP;none;30;2.0)",
+                        "  - ZOMBIEMOD: Requires ZombieMod points. (e.g., ZOMBIEMOD;points;5000;2.0)"
                 )
                 .defineListAllowEmpty("upgrades", List.of(
                         "ITEM;minecraft:diamond_block;12;1.2",

@@ -404,6 +404,10 @@ public class PackAPunchBlockEntity extends BlockEntity implements MenuProvider {
                 requirementName = "Levels";
                 canAfford = player.experienceLevel >= cost;
             }
+            case ZOMBIEMOD -> {
+                requirementName = (tier.getId().isEmpty() || tier.getId().equalsIgnoreCase("none")) ? "Zombie Points" : tier.getId();
+                canAfford = com.myname.packapunch.compat.ZombieModIntegration.getPoints(player) >= cost;
+            }
         }
 
         if (player.isCreative()) {
@@ -447,6 +451,9 @@ public class PackAPunchBlockEntity extends BlockEntity implements MenuProvider {
                 }
                 case XP -> {
                     player.giveExperienceLevels(-cost);
+                }
+                case ZOMBIEMOD -> {
+                    com.myname.packapunch.compat.ZombieModIntegration.deductPoints(player, cost);
                 }
             }
         }

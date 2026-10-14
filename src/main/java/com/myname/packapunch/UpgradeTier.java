@@ -4,7 +4,8 @@ public class UpgradeTier {
     public enum CurrencyType {
         ITEM,
         SCOREBOARD,
-        XP
+        XP,
+        ZOMBIEMOD
     }
 
     private final CurrencyType currencyType;
