@@ -163,6 +163,9 @@ public class TooltipHandler {
                 case XP -> {
                     reqName = "Levels";
                 }
+                case ZOMBIEMOD -> {
+                    reqName = (tier.getId().isEmpty() || tier.getId().equalsIgnoreCase("none")) ? "Zombie Points" : tier.getId();
+                }
             }
             
             event.getToolTip().add(insertIndex,
